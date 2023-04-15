@@ -73,7 +73,10 @@ func (r *RulesBasedSamplerCondition) setMatchesFunction() error {
 		return nil
 	case "!=", "=", ">", "<", "<=", ">=":
 		return setCompareOperators(r, r.Operator)
-	case "starts-with", "contains", "does-not-contain":
+	case "starts-with", "starts-with-i",
+		"contains", "contains-i",
+		"does-not-contain", "does-not-contain-i",
+		"ends-with", "ends-with-i":
 		err := setMatchStringBasedOperators(r, r.Operator)
 		if err != nil {
 			return err
@@ -160,7 +163,7 @@ func setCompareOperators(r *RulesBasedSamplerCondition, condition string) error 
 		case "!=":
 			r.Matches = func(spanValue any, exists bool) bool {
 				if n, ok := tryConvertToString(spanValue); exists && ok {
-					return n != conditionValue
+					return !strings.EqualFold(n, conditionValue)
 				}
 				return false
 			}
@@ -168,7 +171,7 @@ func setCompareOperators(r *RulesBasedSamplerCondition, condition string) error 
 		case "=":
 			r.Matches = func(spanValue any, exists bool) bool {
 				if n, ok := tryConvertToString(spanValue); exists && ok {
-					return n == conditionValue
+					return strings.EqualFold(n, conditionValue)
 				}
 				return false
 			}
@@ -346,6 +349,26 @@ func setMatchStringBasedOperators(r *RulesBasedSamplerCondition, condition strin
 	}
 
 	switch condition {
+	case "ends-with":
+		r.Matches = func(spanValue any, exists bool) bool {
+			s, ok := tryConvertToString(spanValue)
+			if ok {
+				return strings.HasSuffix(s, conditionValue)
+			}
+			return false
+		}
+
+	// ends with -i (Ignore case)
+	case "ends-with-i":
+		r.Matches = func(spanValue any, exists bool) bool {
+			s, ok := tryConvertToString(spanValue)
+			if ok {
+				return strings.HasSuffix(strings.ToLower(s),
+					strings.ToLower(conditionValue))
+			}
+			return false
+		}
+
 	case "starts-with":
 		r.Matches = func(spanValue any, exists bool) bool {
 			s, ok := tryConvertToString(spanValue)
@@ -354,6 +377,17 @@ func setMatchStringBasedOperators(r *RulesBasedSamplerCondition, condition strin
 			}
 			return false
 		}
+
+	case "starts-with-i":
+		r.Matches = func(spanValue any, exists bool) bool {
+			s, ok := tryConvertToString(spanValue)
+			if ok {
+				return strings.HasPrefix(strings.ToLower(s),
+					strings.ToLower(conditionValue))
+			}
+			return false
+		}
+
 	case "contains":
 		r.Matches = func(spanValue any, exists bool) bool {
 			s, ok := tryConvertToString(spanValue)
@@ -362,11 +396,33 @@ func setMatchStringBasedOperators(r *RulesBasedSamplerCondition, condition strin
 			}
 			return false
 		}
+
+	case "contains-i":
+		r.Matches = func(spanValue any, exists bool) bool {
+			s, ok := tryConvertToString(spanValue)
+			if ok {
+				return strings.Contains(
+					strings.ToLower(s),
+					strings.ToLower(conditionValue))
+			}
+			return false
+		}
+
 	case "does-not-contain":
 		r.Matches = func(spanValue any, exists bool) bool {
 			s, ok := tryConvertToString(spanValue)
 			if ok {
 				return !strings.Contains(s, conditionValue)
+			}
+			return false
+		}
+
+	case "does-not-contain-i":
+		r.Matches = func(spanValue any, exists bool) bool {
+			s, ok := tryConvertToString(spanValue)
+			if ok {
+				return !strings.Contains(strings.ToLower(s),
+					strings.ToLower(conditionValue))
 			}
 			return false
 		}
